@@ -43,6 +43,17 @@ export const ALLOWED_MODELS = [
   "chatgpt-4o-latest"
 ];
 
+export const DEPRECATED_MODELS = [
+  "text-davinci-001",
+  "text-davinci-002",
+  "text-davinci-003",
+  "text-curie-001",
+  "text-babbage-001",
+  "text-ada-001"
+];
+
+export const BENCHMARK_MODELS = Array.from(new Set([...ALLOWED_MODELS, ...DEPRECATED_MODELS]));
+
 export const IMAGE_MIME_TYPES = [
   "image/png",
   "image/jpeg",
