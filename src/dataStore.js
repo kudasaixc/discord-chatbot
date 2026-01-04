@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { DEFAULT_MODEL } from "./constants.js";
+import { DEFAULT_MODEL, DEFAULT_PERSONA_PARAMETERS } from "./constants.js";
 
 const DATA_PATH = path.resolve("data", "persona-data.json");
 
@@ -107,7 +107,8 @@ export class DataStore {
     const personas = this.getGuildPersonas(guildId);
     const personaName = data.currentPersona[guildId] || Object.keys(personas)[0];
     const persona = normalizePersonaValue(personas[personaName]);
-    return { name: personaName, description: persona.description, parameters: persona.parameters };
+    const parameters = { ...DEFAULT_PERSONA_PARAMETERS, ...persona.parameters };
+    return { name: personaName, description: persona.description, parameters };
   }
 
   getModel() {

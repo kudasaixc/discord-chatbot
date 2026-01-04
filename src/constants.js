@@ -75,3 +75,7 @@ export const IMAGE_CAPABLE_MODELS = new Set([
 export const MAX_CONTEXT_MESSAGES = 15;
 
 export const COST_PER_TOKEN_USD = 0.0000003; // approximate blended cost for estimation only
+
+export const DEFAULT_PERSONA_PARAMETERS = {
+  max_completion_tokens: 500
+};

@@ -18,7 +18,7 @@ export async function generatePersonaFromIdea(openai, store, idea) {
         content: `Crée une persona à partir de cette demande utilisateur : ${idea}. Assure-toi que la persona suit strictement les souhaits décrits.`
       }
     ],
-    max_tokens: 350,
+    max_completion_tokens: 350,
     temperature: 0.9
   });
 

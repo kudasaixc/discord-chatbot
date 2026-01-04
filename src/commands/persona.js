@@ -99,7 +99,7 @@ async function handleCreate(interaction, store) {
     top_p: interaction.options.getNumber("top_p"),
     presence_penalty: interaction.options.getNumber("presence_penalty"),
     frequency_penalty: interaction.options.getNumber("frequency_penalty"),
-    max_tokens: interaction.options.getInteger("max_tokens")
+    max_completion_tokens: interaction.options.getInteger("max_tokens")
   };
 
   const filteredParameters = Object.fromEntries(
