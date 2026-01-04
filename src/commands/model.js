@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, PermissionFlagsBits } from "discord.js";
+import { MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 import { ALLOWED_MODELS } from "../constants.js";
 
 export const data = new SlashCommandBuilder()
@@ -18,7 +18,7 @@ export async function execute({ interaction, ownerId, store }) {
   if (interaction.user.id !== ownerId) {
     await interaction.reply({
       content: "Seul le propriétaire du bot peut changer le modèle",
-      ephemeral: true
+      flags: MessageFlags.Ephemeral
     });
     return;
   }
@@ -27,7 +27,7 @@ export async function execute({ interaction, ownerId, store }) {
   if (sub === "set") {
     const name = interaction.options.getString("nom");
     if (!ALLOWED_MODELS.includes(name)) {
-      await interaction.reply({ content: `Le modèle **${name}** n'est pas autorisé.`, ephemeral: true });
+      await interaction.reply({ content: `Le modèle **${name}** n'est pas autorisé.`, flags: MessageFlags.Ephemeral });
       return;
     }
     store.setModel(name);

@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, PermissionFlagsBits } from "discord.js";
+import { MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 import { BENCHMARK_MODELS } from "../constants.js";
 
 export const data = new SlashCommandBuilder()
@@ -10,12 +10,12 @@ export async function execute({ interaction, openai, ownerId }) {
   if (interaction.user.id !== ownerId) {
     await interaction.reply({
       content: "Seul le propriétaire du bot peut lancer le benchmark des modèles",
-      ephemeral: true
+      flags: MessageFlags.Ephemeral
     });
     return;
   }
 
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const results = [];
   for (const model of BENCHMARK_MODELS) {

@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { Client, GatewayIntentBits, Partials, Events, REST, Routes } from "discord.js";
+import { Client, Events, GatewayIntentBits, MessageFlags, Partials, REST, Routes } from "discord.js";
 import { OpenAI } from "openai";
 import { DataStore } from "./dataStore.js";
 import {
@@ -65,12 +65,12 @@ client.on(Events.InteractionCreate, async interaction => {
     if (interaction.deferred || interaction.replied) {
       await interaction.followUp({
         content: "Une erreur est survenue lors du traitement de la commande. Merci de réessayer.",
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       });
     } else {
       await interaction.reply({
         content: "Une erreur est survenue lors du traitement de la commande. Merci de réessayer.",
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       });
     }
   }
@@ -91,6 +91,29 @@ client.on(Events.MessageCreate, async message => {
   const cleanedContent = message.content.replace(/<@!?\d+>/g, "").trim();
   await respondWithLLM(message, cleanedContent);
 });
+
+function formatAssistantContent(content) {
+  if (!content) return "";
+
+  if (typeof content === "string") {
+    return content.trim();
+  }
+
+  if (Array.isArray(content)) {
+    return content
+      .map(part => {
+        if (typeof part === "string") return part.trim();
+        if (part?.type === "text" && part?.text) return part.text;
+        if (part?.type === "refusal" && part?.content) return part.content;
+        return "";
+      })
+      .filter(Boolean)
+      .join("\n")
+      .trim();
+  }
+
+  return "";
+}
 
 async function respondWithLLM(message, userContent) {
   const persona = store.getActivePersona(message.guildId);
@@ -144,7 +167,7 @@ async function respondWithLLM(message, userContent) {
 
     const completion = await openai.chat.completions.create(completionOptions);
 
-    const answer = completion.choices[0]?.message?.content?.trim() || "(pas de contenu)";
+    const answer = formatAssistantContent(completion.choices[0]?.message?.content) || "(pas de contenu)";
     const usageTokens = completion.usage?.total_tokens || 0;
 
     store.pushToContext(message.guildId, message.channelId, { role: "user", content: contentParts });

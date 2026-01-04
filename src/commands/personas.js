@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, PermissionFlagsBits } from "discord.js";
+import { MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 import { formatParameters } from "../utils/formatParameters.js";
 
 export const data = new SlashCommandBuilder()
@@ -19,5 +19,5 @@ export async function execute({ interaction, store }) {
     .join("\n");
 
   const content = description || "Aucune persona définie";
-  await interaction.reply({ content, ephemeral: true });
+  await interaction.reply({ content, flags: MessageFlags.Ephemeral });
 }
