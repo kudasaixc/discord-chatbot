@@ -15,6 +15,16 @@ function ensureDataFile() {
   }
 }
 
+function normalizePersonaValue(value) {
+  if (typeof value === "string") {
+    return { description: value, parameters: {} };
+  }
+
+  const description = value?.description || "";
+  const parameters = value?.parameters || {};
+  return { description, parameters };
+}
+
 function readData() {
   ensureDataFile();
   const raw = fs.readFileSync(DATA_PATH, "utf8");
@@ -37,15 +47,30 @@ export class DataStore {
     }
     if (!data.personas[guildId].default) {
       data.personas[guildId].default = "Tu es Kudachat, un bot Discord serviable créé par kudasai_. Reste poli et clair.";
+    }
+
+    const normalized = {};
+    let mutated = false;
+    for (const [name, value] of Object.entries(data.personas[guildId])) {
+      const persona = normalizePersonaValue(value);
+      if (typeof value === "string" || !value?.description || !value?.parameters) {
+        mutated = true;
+      }
+      normalized[name] = persona;
+    }
+
+    if (mutated) {
+      data.personas[guildId] = normalized;
       writeData(data);
     }
+
     return data.personas[guildId];
   }
 
-  createPersona(guildId, name, description) {
+  createPersona(guildId, name, description, parameters = {}) {
     const data = readData();
     if (!data.personas[guildId]) data.personas[guildId] = {};
-    data.personas[guildId][name] = description;
+    data.personas[guildId][name] = { description, parameters };
     writeData(data);
   }
 
@@ -81,7 +106,8 @@ export class DataStore {
     const data = readData();
     const personas = this.getGuildPersonas(guildId);
     const personaName = data.currentPersona[guildId] || Object.keys(personas)[0];
-    return { name: personaName, description: personas[personaName] };
+    const persona = normalizePersonaValue(personas[personaName]);
+    return { name: personaName, description: persona.description, parameters: persona.parameters };
   }
 
   getModel() {

@@ -71,6 +71,39 @@ const commands = [
             .setDescription("Description/comportement de la persona")
             .setRequired(true)
         )
+        .addNumberOption(option =>
+          option
+            .setName("temperature")
+            .setDescription(
+              "Contrôle la créativité (0-2). Plus c'est élevé, plus les réponses sont imprévisibles/stupides. Optionnel."
+            )
+        )
+        .addNumberOption(option =>
+          option
+            .setName("top_p")
+            .setDescription(
+              "Sélectionne dans le haut du spectre de probabilité (0-1). Plus c'est élevé, plus c'est libre/chaotique. Optionnel."
+            )
+        )
+        .addNumberOption(option =>
+          option
+            .setName("presence_penalty")
+            .setDescription(
+              "Décourage les répétitions. Plus c'est haut, plus le bot explore de nouveaux sujets (peut sembler moins cohérent)."
+            )
+        )
+        .addNumberOption(option =>
+          option
+            .setName("frequency_penalty")
+            .setDescription(
+              "Pénalise la répétition de mots. Plus c'est haut, plus le style est varié mais aussi imprévisible. Optionnel."
+            )
+        )
+        .addIntegerOption(option =>
+          option
+            .setName("max_tokens")
+            .setDescription("Longueur max de réponse. Plus c'est bas, plus c'est concis. Optionnel.")
+        )
     )
     .addSubcommand(sub =>
       sub
@@ -216,6 +249,7 @@ async function respondWithLLM(message, userContent) {
   const persona = store.getActivePersona(message.guildId);
   const model = store.getModel();
   const existingContext = store.getContext(message.guildId, message.channelId);
+  const personaSettings = persona.parameters || {};
 
   const contentParts = [];
   if (userContent) {
@@ -250,11 +284,19 @@ async function respondWithLLM(message, userContent) {
   message.channel.sendTyping();
 
   try {
-    const completion = await openai.chat.completions.create({
+    const completionOptions = {
       model,
       messages,
-      max_tokens: 500
-    });
+      max_tokens: personaSettings.max_tokens ?? 500
+    };
+
+    for (const key of ["temperature", "top_p", "presence_penalty", "frequency_penalty"]) {
+      if (personaSettings[key] !== null && personaSettings[key] !== undefined) {
+        completionOptions[key] = personaSettings[key];
+      }
+    }
+
+    const completion = await openai.chat.completions.create(completionOptions);
 
     const answer = completion.choices[0]?.message?.content?.trim() || "(pas de contenu)";
     const usageTokens = completion.usage?.total_tokens || 0;
@@ -280,6 +322,26 @@ async function sendChunkedText(channel, content) {
   for (const chunk of chunks) {
     await channel.send(chunk);
   }
+}
+
+function formatParameters(parameters = {}) {
+  const labels = {
+    temperature: "temp",
+    top_p: "top_p",
+    presence_penalty: "presence_penalty",
+    frequency_penalty: "frequency_penalty",
+    max_tokens: "max_tokens"
+  };
+
+  const entries = Object.entries(labels)
+    .map(([key, label]) => {
+      const value = parameters[key];
+      if (value === null || value === undefined) return null;
+      return `${label}=${value}`;
+    })
+    .filter(Boolean);
+
+  return entries.length ? entries.join(", ") : "";
 }
 
 async function generatePersonaFromIdea(idea) {
@@ -348,7 +410,12 @@ async function handlePersonas(interaction) {
   const personas = store.getGuildPersonas(interaction.guildId);
   const activePersona = store.getActivePersona(interaction.guildId).name;
   const description = Object.entries(personas)
-    .map(([name, desc]) => `${name === activePersona ? "(active) " : ""}${name} : ${desc}`)
+    .map(([name, persona]) => {
+      const normalized = persona?.description ? persona : { description: String(persona || ""), parameters: {} };
+      const parameters = formatParameters(normalized.parameters);
+      const paramSuffix = parameters ? ` [${parameters}]` : "";
+      return `${name === activePersona ? "(active) " : ""}${name} : ${normalized.description}${paramSuffix}`;
+    })
     .join("\n");
 
   const content = description || "Aucune persona définie";
@@ -360,7 +427,19 @@ async function handlePersona(interaction) {
   if (sub === "create") {
     const name = interaction.options.getString("nom");
     const description = interaction.options.getString("description");
-    store.createPersona(interaction.guildId, name, description);
+    const parameters = {
+      temperature: interaction.options.getNumber("temperature"),
+      top_p: interaction.options.getNumber("top_p"),
+      presence_penalty: interaction.options.getNumber("presence_penalty"),
+      frequency_penalty: interaction.options.getNumber("frequency_penalty"),
+      max_tokens: interaction.options.getInteger("max_tokens")
+    };
+
+    const filteredParameters = Object.fromEntries(
+      Object.entries(parameters).filter(([, value]) => value !== null && value !== undefined)
+    );
+
+    store.createPersona(interaction.guildId, name, description, filteredParameters);
     await interaction.reply({ content: `La persona **${name}** a été ajoutée.`, ephemeral: true });
   }
 
