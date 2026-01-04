@@ -75,28 +75,28 @@ const commands = [
           option
             .setName("temperature")
             .setDescription(
-              "Contrôle la créativité (0-2). Plus c'est élevé, plus les réponses sont imprévisibles/stupides. Optionnel."
+              "Contrôle la créativité (0-2). Valeur haute = réponses plus libres/imprévisibles. Optionnel."
             )
         )
         .addNumberOption(option =>
           option
             .setName("top_p")
             .setDescription(
-              "Sélectionne dans le haut du spectre de probabilité (0-1). Plus c'est élevé, plus c'est libre/chaotique. Optionnel."
+              "Sélectionne le haut des probabilités (0-1). Valeur haute = sortie plus libre/chaotique. Optionnel."
             )
         )
         .addNumberOption(option =>
           option
             .setName("presence_penalty")
             .setDescription(
-              "Décourage les répétitions. Plus c'est haut, plus le bot explore de nouveaux sujets (peut sembler moins cohérent)."
+              "Décourage les répétitions. Valeur haute = explore de nouveaux sujets (peut sembler moins cohérent)."
             )
         )
         .addNumberOption(option =>
           option
             .setName("frequency_penalty")
             .setDescription(
-              "Pénalise la répétition de mots. Plus c'est haut, plus le style est varié mais aussi imprévisible. Optionnel."
+              "Pénalise la répétition de mots. Valeur haute = style plus varié/imprévisible. Optionnel."
             )
         )
         .addIntegerOption(option =>
