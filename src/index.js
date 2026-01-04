@@ -22,6 +22,7 @@ import {
 
 const TOKEN = process.env.DISCORD_TOKEN;
 const CLIENT_ID = process.env.DISCORD_CLIENT_ID;
+const GUILD_ID = process.env.DISCORD_GUILD_ID;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 if (!TOKEN || !CLIENT_ID || !OPENAI_API_KEY) {
@@ -138,6 +139,13 @@ async function registerCommands() {
     body: commands.map(command => command.toJSON())
   });
   console.log("✅ Commandes globales synchronisées");
+
+  if (GUILD_ID) {
+    await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), {
+      body: commands.map(command => command.toJSON())
+    });
+    console.log(`✅ Commandes synchronisées sur le serveur ${GUILD_ID}`);
+  }
 }
 
 client.once(Events.ClientReady, () => {
