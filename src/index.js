@@ -13,6 +13,7 @@ import { OpenAI } from "openai";
 import { DataStore } from "./dataStore.js";
 import {
   ALLOWED_MODELS,
+  BENCHMARK_MODELS,
   COST_PER_TOKEN_USD,
   IMAGE_CAPABLE_MODELS,
   IMAGE_MIME_TYPES,
@@ -125,7 +126,10 @@ const commands = [
             .setDescription("Nom du modèle parmi la liste autorisée")
             .setRequired(true)
         )
-    )
+    ),
+  new SlashCommandBuilder()
+    .setName("benchmark")
+    .setDescription("Tester les modèles accessibles avec la clé API (propriétaire seulement)")
 ];
 
 async function registerCommands() {
@@ -161,6 +165,9 @@ client.on(Events.InteractionCreate, async interaction => {
         break;
       case "model":
         await handleModel(interaction);
+        break;
+      case "benchmark":
+        await handleBenchmark(interaction);
         break;
       default:
         break;
@@ -322,7 +329,8 @@ async function handleHelp(interaction) {
     "• /persona delete : supprimer une persona (admin)",
     "• /clearcontext : vider le contexte du salon (admin)",
     "• /dashboard : voir l'estimation d'usage (admin)",
-    "• /model set : changer le modèle (propriétaire seulement)"
+    "• /model set : changer le modèle (propriétaire seulement)",
+    "• /benchmark : tester l'accès aux modèles OpenAI (propriétaire)"
   ].join("\n");
 
   await interaction.reply({ content, ephemeral: true });
@@ -427,6 +435,42 @@ async function handleDashboard(interaction) {
   ];
 
   await interaction.reply({ content: lines.join("\n"), ephemeral: true });
+}
+
+async function handleBenchmark(interaction) {
+  if (interaction.user.id !== OWNER_ID) {
+    await interaction.reply({
+      content: "Seul le propriétaire du bot peut lancer le benchmark des modèles",
+      ephemeral: true
+    });
+    return;
+  }
+
+  await interaction.deferReply({ ephemeral: true });
+
+  const results = [];
+  for (const model of BENCHMARK_MODELS) {
+    try {
+      await openai.models.retrieve(model);
+      results.push({ model, ok: true });
+    } catch (error) {
+      const message = error?.response?.data?.error?.message || error.message || "Motif inconnu";
+      results.push({ model, ok: false, message });
+    }
+  }
+
+  const accessible = results.filter(result => result.ok).map(result => result.model);
+  const rejected = results.filter(result => !result.ok);
+
+  const lines = [
+    `Benchmark terminé pour ${results.length} modèles :`,
+    `Accessible (${accessible.length}) : ${accessible.join(", ") || "aucun"}.`,
+    `Inaccessibles (${rejected.length}) : ${
+      rejected.map(result => `${result.model} (${result.message})`).join("; ") || "aucun"
+    }.`,
+  ];
+
+  await interaction.editReply({ content: lines.join("\n") });
 }
 
 async function handleModel(interaction) {
