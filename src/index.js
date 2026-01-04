@@ -2,7 +2,12 @@ import "dotenv/config";
 import { Client, GatewayIntentBits, Partials, Events, REST, Routes } from "discord.js";
 import { OpenAI } from "openai";
 import { DataStore } from "./dataStore.js";
-import { IMAGE_CAPABLE_MODELS, IMAGE_MIME_TYPES, MAX_CONTEXT_MESSAGES } from "./constants.js";
+import {
+  IMAGE_CAPABLE_MODELS,
+  IMAGE_MIME_TYPES,
+  MAX_CONTEXT_MESSAGES,
+  DEFAULT_PERSONA_PARAMETERS
+} from "./constants.js";
 import { commandData, commandHandlers } from "./commands/index.js";
 
 const TOKEN = process.env.DISCORD_TOKEN;
@@ -126,16 +131,15 @@ async function respondWithLLM(message, userContent) {
   message.channel.sendTyping();
 
   try {
-    const completionOptions = {
-      model,
-      messages,
-      max_tokens: personaSettings.max_tokens ?? 500
-    };
+    const completionOptions = { model, messages };
 
-    for (const key of ["temperature", "top_p", "presence_penalty", "frequency_penalty"]) {
-      if (personaSettings[key] !== null && personaSettings[key] !== undefined) {
-        completionOptions[key] = personaSettings[key];
-      }
+    const parameters = { ...DEFAULT_PERSONA_PARAMETERS, ...personaSettings };
+    const keyMapping = { max_tokens: "max_completion_tokens" };
+
+    for (const [key, value] of Object.entries(parameters)) {
+      if (value === null || value === undefined) continue;
+      const targetKey = keyMapping[key] || key;
+      completionOptions[targetKey] = value;
     }
 
     const completion = await openai.chat.completions.create(completionOptions);

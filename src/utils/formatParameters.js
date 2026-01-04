@@ -4,6 +4,7 @@ export function formatParameters(parameters = {}) {
     top_p: "top_p",
     presence_penalty: "presence_penalty",
     frequency_penalty: "frequency_penalty",
+    max_completion_tokens: "max_tokens",
     max_tokens: "max_tokens"
   };
 
