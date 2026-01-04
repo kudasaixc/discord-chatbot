@@ -238,8 +238,7 @@ async function respondWithLLM(message, userContent) {
     store.trimContext(message.guildId, message.channelId, MAX_CONTEXT_MESSAGES);
     store.addUsage(message.guildId, usageTokens);
 
-    const answerWithMeta = `${answer}\n\nPersona: ${persona.name} | Modèle: ${model} | Tokens: ${usageTokens}`;
-    await sendChunkedText(message.channel, answerWithMeta);
+    await sendChunkedText(message.channel, answer);
   } catch (error) {
     console.error("Erreur OpenAI", error);
     await message.channel.send(
