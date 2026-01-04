@@ -6,13 +6,18 @@ import {
   Events,
   REST,
   Routes,
-  EmbedBuilder,
   SlashCommandBuilder,
   PermissionFlagsBits
 } from "discord.js";
 import { OpenAI } from "openai";
 import { DataStore } from "./dataStore.js";
-import { ALLOWED_MODELS, COST_PER_TOKEN_USD, IMAGE_MIME_TYPES, MAX_CONTEXT_MESSAGES } from "./constants.js";
+import {
+  ALLOWED_MODELS,
+  COST_PER_TOKEN_USD,
+  IMAGE_CAPABLE_MODELS,
+  IMAGE_MIME_TYPES,
+  MAX_CONTEXT_MESSAGES
+} from "./constants.js";
 
 const TOKEN = process.env.DISCORD_TOKEN;
 const CLIENT_ID = process.env.DISCORD_CLIENT_ID;
@@ -76,6 +81,17 @@ const commands = [
             .setRequired(true)
         )
     )
+    .addSubcommand(sub =>
+      sub
+        .setName("delete")
+        .setDescription("Supprimer une persona existante")
+        .addStringOption(option =>
+          option
+            .setName("nom")
+            .setDescription("Nom de la persona à supprimer")
+            .setRequired(true)
+        )
+    )
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
   new SlashCommandBuilder()
     .setName("clearcontext")
@@ -96,9 +112,6 @@ const commands = [
           option
             .setName("nom")
             .setDescription("Nom du modèle parmi la liste autorisée")
-            .setChoices(
-              ...ALLOWED_MODELS.map(model => ({ name: model, value: model }))
-            )
             .setRequired(true)
         )
     )
@@ -143,14 +156,16 @@ client.on(Events.InteractionCreate, async interaction => {
     }
   } catch (error) {
     console.error("Erreur pendant l'exécution de la commande", error);
-    const embed = new EmbedBuilder()
-      .setTitle("Erreur")
-      .setDescription("Une erreur est survenue lors du traitement de la commande. Merci de réessayer.")
-      .setColor("DarkRed");
     if (interaction.deferred || interaction.replied) {
-      await interaction.followUp({ embeds: [embed], ephemeral: true });
+      await interaction.followUp({
+        content: "Une erreur est survenue lors du traitement de la commande. Merci de réessayer.",
+        ephemeral: true
+      });
     } else {
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      await interaction.reply({
+        content: "Une erreur est survenue lors du traitement de la commande. Merci de réessayer.",
+        ephemeral: true
+      });
     }
   }
 });
@@ -186,6 +201,13 @@ async function respondWithLLM(message, userContent) {
     contentParts.push({ type: "image_url", image_url: { url: attachment.url } });
   }
 
+  if (imageAttachments.size > 0 && !IMAGE_CAPABLE_MODELS.has(model)) {
+    await message.channel.send(
+      `Le modèle **${model}** ne prend pas en charge les images. Choisis un modèle compatible avant d'envoyer une image.`
+    );
+    return;
+  }
+
   const systemPrompt = `Tu es Kudachat, un bot Discord francophone créé par kudasai_. Reste concis, naturel et empathique. Persona actuelle: ${persona.name}. Comportement: ${persona.description}. Contexte global: ${GLOBAL_PERSONA_CONTEXT} Réponds au format Markdown et évite les messages trop longs.`;
 
   if (contentParts.length === 0) {
@@ -198,12 +220,8 @@ async function respondWithLLM(message, userContent) {
     { role: "user", content: contentParts }
   ];
 
-  const thinking = new EmbedBuilder()
-    .setTitle("Kudachat est en train d'écrire...")
-    .setDescription("Je réfléchis à ma réponse avec OpenAI 🤖")
-    .setColor("Blue");
-
-  await message.channel.send({ embeds: [thinking] });
+  const typing = setInterval(() => message.channel.sendTyping(), 8000);
+  message.channel.sendTyping();
 
   try {
     const completion = await openai.chat.completions.create({
@@ -220,72 +238,50 @@ async function respondWithLLM(message, userContent) {
     store.trimContext(message.guildId, message.channelId, MAX_CONTEXT_MESSAGES);
     store.addUsage(message.guildId, usageTokens);
 
-    const responseEmbeds = buildResponseEmbeds(answer, {
-      persona: persona.name,
-      model,
-      tokens: usageTokens
-    });
-
-    await message.channel.send({ embeds: responseEmbeds });
+    const answerWithMeta = `${answer}\n\nPersona: ${persona.name} | Modèle: ${model} | Tokens: ${usageTokens}`;
+    await sendChunkedText(message.channel, answerWithMeta);
   } catch (error) {
     console.error("Erreur OpenAI", error);
-    const embed = new EmbedBuilder()
-      .setTitle("Erreur OpenAI")
-      .setDescription("Impossible d'obtenir une réponse pour le moment. Merci de réessayer plus tard.")
-      .setColor("DarkRed");
-    await message.channel.send({ embeds: [embed] });
+    await message.channel.send(
+      "Impossible d'obtenir une réponse pour le moment. Merci de réessayer plus tard."
+    );
+  } finally {
+    clearInterval(typing);
   }
 }
 
-function buildResponseEmbeds(content, meta = {}) {
-  const chunks = content.match(/.{1,3500}/gs) || [content];
-  const embeds = chunks.map((chunk, index) => {
-    const embed = new EmbedBuilder()
-      .setColor("Green")
-      .setAuthor({ name: "Kudachat", url: "https://openai.com" })
-      .setDescription(chunk);
-    if (index === 0) {
-      embed.setFooter({
-        text: `Persona: ${meta.persona || "-"} | Modèle: ${meta.model || "-"} | Tokens: ${meta.tokens || 0}`
-      });
-    }
-    return embed;
-  });
-  return embeds;
+async function sendChunkedText(channel, content) {
+  const chunks = content.match(/.{1,1900}/gs) || [content];
+  for (const chunk of chunks) {
+    await channel.send(chunk);
+  }
 }
 
 async function handleHelp(interaction) {
-  const embed = new EmbedBuilder()
-    .setTitle("Aide Kudachat")
-    .setDescription("Liste des commandes disponibles")
-    .addFields(
-      { name: "/help", value: "Afficher cette aide" },
-      { name: "/personas", value: "Lister les personas (admin)" },
-      { name: "/persona create", value: "Créer une nouvelle persona (admin)" },
-      { name: "/persona set", value: "Activer une persona existante (admin)" },
-      { name: "/clearcontext", value: "Vider le contexte du salon (admin)" },
-      { name: "/dashboard", value: "Voir l'estimation d'usage (admin)" },
-      { name: "/model set", value: "Changer le modèle (propriétaire seulement)" }
-    )
-    .setFooter({ text: "Kudachat par kudasai_" })
-    .setColor("Aqua");
+  const content = [
+    "Aide Kudachat — Liste des commandes disponibles :",
+    "• /help : afficher cette aide",
+    "• /personas : lister les personas (admin)",
+    "• /persona create : créer une nouvelle persona (admin)",
+    "• /persona set : activer une persona existante (admin)",
+    "• /persona delete : supprimer une persona (admin)",
+    "• /clearcontext : vider le contexte du salon (admin)",
+    "• /dashboard : voir l'estimation d'usage (admin)",
+    "• /model set : changer le modèle (propriétaire seulement)"
+  ].join("\n");
 
-  await interaction.reply({ embeds: [embed], ephemeral: true });
+  await interaction.reply({ content, ephemeral: true });
 }
 
 async function handlePersonas(interaction) {
   const personas = store.getGuildPersonas(interaction.guildId);
   const activePersona = store.getActivePersona(interaction.guildId).name;
   const description = Object.entries(personas)
-    .map(([name, desc]) => `${name === activePersona ? "✅" : ""} **${name}** : ${desc}`)
+    .map(([name, desc]) => `${name === activePersona ? "(active) " : ""}${name} : ${desc}`)
     .join("\n");
 
-  const embed = new EmbedBuilder()
-    .setTitle("Personas disponibles")
-    .setDescription(description || "Aucune persona définie")
-    .setColor("Purple");
-
-  await interaction.reply({ embeds: [embed], ephemeral: true });
+  const content = description || "Aucune persona définie";
+  await interaction.reply({ content, ephemeral: true });
 }
 
 async function handlePersona(interaction) {
@@ -294,63 +290,65 @@ async function handlePersona(interaction) {
     const name = interaction.options.getString("nom");
     const description = interaction.options.getString("description");
     store.createPersona(interaction.guildId, name, description);
-    const embed = new EmbedBuilder()
-      .setTitle("Persona créée")
-      .setDescription(`La persona **${name}** a été ajoutée.`)
-      .setColor("Green");
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.reply({ content: `La persona **${name}** a été ajoutée.`, ephemeral: true });
   }
 
   if (sub === "set") {
     const name = interaction.options.getString("nom");
     try {
       store.setActivePersona(interaction.guildId, name);
-      const embed = new EmbedBuilder()
-        .setTitle("Persona activée")
-        .setDescription(`La persona active est maintenant **${name}**.`)
-        .setColor("Green");
-      await interaction.reply({ embeds: [embed] });
+      const personas = store.getGuildPersonas(interaction.guildId);
+      const list = Object.keys(personas)
+        .map(personaName => `${personaName === name ? "(active) " : ""}${personaName}`)
+        .join(", ");
+      await interaction.reply({
+        content: `La persona active est maintenant **${name}**. Personas disponibles : ${list}`
+      });
     } catch (error) {
-      const embed = new EmbedBuilder()
-        .setTitle("Impossible de changer la persona")
-        .setDescription(error.message)
-        .setColor("DarkRed");
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      await interaction.reply({ content: error.message, ephemeral: true });
+    }
+  }
+
+  if (sub === "delete") {
+    const name = interaction.options.getString("nom");
+    try {
+      store.deletePersona(interaction.guildId, name);
+      const personas = store.getGuildPersonas(interaction.guildId);
+      const list = Object.keys(personas).join(", ") || "aucune";
+      await interaction.reply({
+        content: `La persona **${name}** a été supprimée. Personas restantes : ${list}`,
+        ephemeral: true
+      });
+    } catch (error) {
+      await interaction.reply({ content: error.message, ephemeral: true });
     }
   }
 }
 
 async function handleClearContext(interaction) {
   store.clearContext(interaction.guildId, interaction.channelId);
-  const embed = new EmbedBuilder()
-    .setTitle("Contexte effacé")
-    .setDescription("Tout le contexte de ce salon a été vidé.")
-    .setColor("Orange");
-  await interaction.reply({ embeds: [embed] });
+  await interaction.reply({ content: "Tout le contexte de ce salon a été vidé." });
 }
 
 async function handleDashboard(interaction) {
   const tokens = store.getUsage(interaction.guildId);
   const cost = tokens * COST_PER_TOKEN_USD;
-  const embed = new EmbedBuilder()
-    .setTitle("Tableau de bord de l'usage")
-    .addFields(
-      { name: "Tokens utilisés", value: tokens.toString(), inline: true },
-      { name: "Coût estimé", value: `$${cost.toFixed(4)}`, inline: true },
-      { name: "Modèle actuel", value: store.getModel(), inline: true }
-    )
-    .setColor("Blue");
+  const lines = [
+    "Tableau de bord de l'usage :",
+    `Tokens utilisés : ${tokens}`,
+    `Coût estimé : $${cost.toFixed(4)}`,
+    `Modèle actuel : ${store.getModel()}`
+  ];
 
-  await interaction.reply({ embeds: [embed], ephemeral: true });
+  await interaction.reply({ content: lines.join("\n"), ephemeral: true });
 }
 
 async function handleModel(interaction) {
   if (interaction.user.id !== OWNER_ID) {
-    const embed = new EmbedBuilder()
-      .setTitle("Action non autorisée")
-      .setDescription("Seul le propriétaire du bot peut changer le modèle")
-      .setColor("DarkRed");
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.reply({
+      content: "Seul le propriétaire du bot peut changer le modèle",
+      ephemeral: true
+    });
     return;
   }
 
@@ -358,19 +356,11 @@ async function handleModel(interaction) {
   if (sub === "set") {
     const name = interaction.options.getString("nom");
     if (!ALLOWED_MODELS.includes(name)) {
-      const embed = new EmbedBuilder()
-        .setTitle("Modèle invalide")
-        .setDescription(`Le modèle **${name}** n'est pas autorisé.`)
-        .setColor("DarkRed");
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      await interaction.reply({ content: `Le modèle **${name}** n'est pas autorisé.`, ephemeral: true });
       return;
     }
     store.setModel(name);
-    const embed = new EmbedBuilder()
-      .setTitle("Modèle mis à jour")
-      .setDescription(`Le modèle OpenAI actif est maintenant **${name}**.`)
-      .setColor("Green");
-    await interaction.reply({ embeds: [embed] });
+    await interaction.reply({ content: `Le modèle OpenAI actif est maintenant **${name}**.` });
   }
 }
 

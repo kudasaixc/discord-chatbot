@@ -49,6 +49,23 @@ export class DataStore {
     writeData(data);
   }
 
+  deletePersona(guildId, name) {
+    const data = readData();
+    const personas = this.getGuildPersonas(guildId);
+    if (!personas[name]) {
+      throw new Error("Persona introuvable pour ce serveur.");
+    }
+    delete personas[name];
+    data.personas[guildId] = personas;
+
+    if (data.currentPersona[guildId] === name) {
+      const remaining = Object.keys(personas);
+      data.currentPersona[guildId] = remaining[0] || "default";
+    }
+
+    writeData(data);
+  }
+
   setActivePersona(guildId, name) {
     const data = readData();
     const personas = this.getGuildPersonas(guildId);
