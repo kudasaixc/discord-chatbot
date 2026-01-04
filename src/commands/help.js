@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from "discord.js";
+import { MessageFlags, SlashCommandBuilder } from "discord.js";
 
 export const data = new SlashCommandBuilder().setName("help").setDescription("Afficher l'aide de Kudachat");
 
@@ -17,5 +17,5 @@ export async function execute({ interaction }) {
     "• /benchmark : tester l'accès aux modèles OpenAI (propriétaire)"
   ].join("\n");
 
-  await interaction.reply({ content, ephemeral: true });
+  await interaction.reply({ content, flags: MessageFlags.Ephemeral });
 }

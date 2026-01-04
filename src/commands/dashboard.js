@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, PermissionFlagsBits } from "discord.js";
+import { MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 import { COST_PER_TOKEN_USD } from "../constants.js";
 
 export const data = new SlashCommandBuilder()
@@ -16,5 +16,5 @@ export async function execute({ interaction, store }) {
     `Modèle actuel : ${store.getModel()}`
   ];
 
-  await interaction.reply({ content: lines.join("\n"), ephemeral: true });
+  await interaction.reply({ content: lines.join("\n"), flags: MessageFlags.Ephemeral });
 }

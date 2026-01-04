@@ -3,6 +3,7 @@ import path from "path";
 import { DEFAULT_MODEL, DEFAULT_PERSONA_PARAMETERS } from "./constants.js";
 
 const DATA_PATH = path.resolve("data", "persona-data.json");
+const DEFAULT_DATA = { personas: {}, currentPersona: {}, usage: {}, model: DEFAULT_MODEL };
 
 function ensureDataFile() {
   const dir = path.dirname(DATA_PATH);
@@ -10,8 +11,7 @@ function ensureDataFile() {
     fs.mkdirSync(dir, { recursive: true });
   }
   if (!fs.existsSync(DATA_PATH)) {
-    const seed = { personas: {}, currentPersona: {}, usage: {}, model: DEFAULT_MODEL };
-    fs.writeFileSync(DATA_PATH, JSON.stringify(seed, null, 2));
+    fs.writeFileSync(DATA_PATH, JSON.stringify(DEFAULT_DATA, null, 2));
   }
 }
 
@@ -28,7 +28,13 @@ function normalizePersonaValue(value) {
 function readData() {
   ensureDataFile();
   const raw = fs.readFileSync(DATA_PATH, "utf8");
-  return JSON.parse(raw);
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    console.warn("Fichier de données invalide détecté. Réinitialisation avec les valeurs par défaut.");
+    writeData(DEFAULT_DATA);
+    return { ...DEFAULT_DATA };
+  }
 }
 
 function writeData(data) {

@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, PermissionFlagsBits } from "discord.js";
+import { MessageFlags, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 import { generatePersonaFromIdea } from "../services/personaGenerator.js";
 
 export const data = new SlashCommandBuilder()
@@ -107,7 +107,7 @@ async function handleCreate(interaction, store) {
   );
 
   store.createPersona(interaction.guildId, name, description, filteredParameters);
-  await interaction.reply({ content: `La persona **${name}** a été ajoutée.`, ephemeral: true });
+  await interaction.reply({ content: `La persona **${name}** a été ajoutée.`, flags: MessageFlags.Ephemeral });
 }
 
 async function handleSet(interaction, store) {
@@ -122,7 +122,7 @@ async function handleSet(interaction, store) {
       content: `La persona active est maintenant **${name}**. Personas disponibles : ${list}`
     });
   } catch (error) {
-    await interaction.reply({ content: error.message, ephemeral: true });
+    await interaction.reply({ content: error.message, flags: MessageFlags.Ephemeral });
   }
 }
 
@@ -134,16 +134,16 @@ async function handleDelete(interaction, store) {
     const list = Object.keys(personas).join(", ") || "aucune";
     await interaction.reply({
       content: `La persona **${name}** a été supprimée. Personas restantes : ${list}`,
-      ephemeral: true
+      flags: MessageFlags.Ephemeral
     });
   } catch (error) {
-    await interaction.reply({ content: error.message, ephemeral: true });
+    await interaction.reply({ content: error.message, flags: MessageFlags.Ephemeral });
   }
 }
 
 async function handleAutoCreate(interaction, openai, store) {
   const idea = interaction.options.getString("idee");
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   try {
     const { name, description, usageTokens } = await generatePersonaFromIdea(openai, store, idea);
@@ -167,7 +167,7 @@ async function handleAutoCreate(interaction, openai, store) {
     console.error("Erreur lors de la génération automatique de persona", error);
     await interaction.editReply({
       content: "Impossible de générer automatiquement la persona pour le moment. Merci de réessayer.",
-      ephemeral: true
+      flags: MessageFlags.Ephemeral
     });
   }
 }
