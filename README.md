@@ -20,6 +20,7 @@ Bot Discord (Node.js) qui combine Discord.js et l'API OpenAI pour répondre natu
    ```bash
    DISCORD_TOKEN=...      # Token du bot Discord
    DISCORD_CLIENT_ID=...  # ID de l'application/bot
+   DISCORD_GUILD_ID=...   # (Optionnel) ID d'un serveur pour synchroniser immédiatement les commandes
    OPENAI_API_KEY=...     # Clé API OpenAI
    ```
 2. Installer les dépendances :
@@ -31,7 +32,7 @@ Bot Discord (Node.js) qui combine Discord.js et l'API OpenAI pour répondre natu
    npm start
    ```
 
-Au premier lancement, les commandes slash sont synchronisées globalement. Les personas et usages sont stockés dans `data/persona-data.json`.
+Au premier lancement, les commandes slash sont synchronisées globalement. Si `DISCORD_GUILD_ID` est fourni, elles sont aussi synchronisées sur ce serveur pour apparaître instantanément (pratique si une commande comme `/benchmark` ne s'affiche pas encore côté Discord). Les personas et usages sont stockés dans `data/persona-data.json`.
 
 ## Commandes Slash
 - `/help` : afficher l'aide.
